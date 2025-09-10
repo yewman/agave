@@ -2628,6 +2628,11 @@ impl Bank {
         }
     }
 
+    pub fn truncated_delta_lt_hash(&self) -> String {
+        let delta_lt_hash = self.calculate_delta_lt_hash();
+        format!("{}", delta_lt_hash).chars().take(16).collect()
+    }
+
     pub fn freeze(&self) {
         // This lock prevents any new commits from BankingStage
         // `Consumer::execute_and_commit_transactions_locked()` from

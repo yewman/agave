@@ -128,7 +128,6 @@ pub fn execute(
         if logfile == "-" {
             None
         } else {
-            println!("log file: {logfile}");
             Some(logfile)
         }
     };

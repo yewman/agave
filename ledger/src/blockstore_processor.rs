@@ -12,7 +12,7 @@ use {
     crossbeam_channel::Sender,
     itertools::Itertools,
     log::*,
-    rayon::{prelude::*, ThreadPool},
+    rayon::ThreadPool,
     scopeguard::defer,
     solana_accounts_db::{
         accounts_db::AccountsDbConfig, accounts_update_notifier_interface::AccountsUpdateNotifier,
@@ -385,12 +385,10 @@ fn execute_batches_internal(
         Mutex::new(HashMap::new());
 
     let mut execute_batches_elapsed = Measure::start("execute_batches_elapsed");
-    let results: Vec<Result<()>> = replay_tx_thread_pool.install(|| {
-        batches
-            .into_par_iter()
+    let results: Vec<Result<()>> = batches
+            .into_iter()
             .map(|transaction_batch| {
-                let transaction_count =
-                    transaction_batch.batch.sanitized_transactions().len() as u64;
+            let transaction_count = transaction_batch.batch.sanitized_transactions().len() as u64;
                 let mut timings = ExecuteTimings::default();
                 let (result, execute_batches_us) = measure_us!(execute_batch(
                     transaction_batch,
@@ -403,7 +401,9 @@ fn execute_batches_internal(
                     None::<fn(&_) -> _>,
                 ));
 
-                let thread_index = replay_tx_thread_pool.current_thread_index().unwrap();
+            let thread_index = replay_tx_thread_pool
+                .current_thread_index()
+                .unwrap_or_default();
                 execution_timings_per_thread
                     .lock()
                     .unwrap()
