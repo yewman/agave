@@ -45,6 +45,10 @@ impl Bank {
     // Ref: distribute_rent_to_validators
     pub(super) fn distribute_transaction_fee_details(&self) {
         let fee_details = self.collector_fee_details.read().unwrap();
+        println!(
+            "\tcollector_id: {}\n\ttransaction_fee: {}\n\tpriority_fee: {}",
+            self.collector_id, fee_details.transaction_fee, fee_details.priority_fee,
+        );
         if fee_details.total() == 0 {
             // nothing to distribute, exit early
             return;

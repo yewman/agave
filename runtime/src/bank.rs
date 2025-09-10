@@ -2647,12 +2647,19 @@ impl Bank {
         // committed before this write lock can be obtained here.
         let mut hash = self.hash.write().unwrap();
         if *hash == Hash::default() {
+            println!("Freezing slot: {}", self.slot());
             // finish up any deferred changes to account state
+            println!("\tdelta_lt_hash 0: {}", self.truncated_delta_lt_hash());
             self.collect_rent_eagerly();
+            println!("\tdelta_lt_hash 1: {}", self.truncated_delta_lt_hash());
             self.distribute_transaction_fee_details();
+            println!("\tdelta_lt_hash 2: {}", self.truncated_delta_lt_hash());
             self.distribute_rent_fees();
+            println!("\tdelta_lt_hash 3: {}", self.truncated_delta_lt_hash());
             self.update_slot_history();
+            println!("\tdelta_lt_hash 4: {}", self.truncated_delta_lt_hash());
             self.run_incinerator();
+            println!("\tdelta_lt_hash 5: {}", self.truncated_delta_lt_hash());
 
             // freeze is a one-way trip, idempotent
             self.freeze_started.store(true, Relaxed);
@@ -2690,6 +2697,7 @@ impl Bank {
                 }
             }
             *hash = self.hash_internal_state();
+            println!("slot={} hash={}", self.slot(), *hash);
             self.rc.accounts.accounts_db.mark_slot_frozen(self.slot());
         }
     }
@@ -3712,6 +3720,10 @@ impl Bank {
             "commit_transactions() working on a bank that is already frozen or is undergoing freezing!"
         );
 
+        let truncated_delta_lt_hash = self.truncated_delta_lt_hash();
+        let expected_delta_lt_hash = "0p3zomxwGdm+S6xI".to_string();
+        let print_txns = truncated_delta_lt_hash == expected_delta_lt_hash;
+
         let ProcessedTransactionCounts {
             processed_transactions_count,
             processed_non_vote_transactions_count,
@@ -3756,6 +3768,7 @@ impl Bank {
                 sanitized_txs,
                 &maybe_transaction_refs,
                 &processing_results,
+                print_txns,
             );
 
             let to_store = (self.slot(), accounts_to_store.as_slice());

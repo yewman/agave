@@ -860,6 +860,8 @@ impl<FG: ForkGraph> TransactionBatchProcessor<FG> {
             self.execution_cost,
         );
 
+        // PRINT STATE HERE IF TXN SIGNATURE MATCHES
+
         let mut process_message_time = Measure::start("process_message_time");
         let process_result = process_message(
             tx,

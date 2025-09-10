@@ -386,49 +386,92 @@ fn execute_batches_internal(
 
     let mut execute_batches_elapsed = Measure::start("execute_batches_elapsed");
     let results: Vec<Result<()>> = batches
-            .into_iter()
-            .map(|transaction_batch| {
+        .into_iter()
+        .map(|transaction_batch| {
             let transaction_count = transaction_batch.batch.sanitized_transactions().len() as u64;
-                let mut timings = ExecuteTimings::default();
-                let (result, execute_batches_us) = measure_us!(execute_batch(
-                    transaction_batch,
-                    bank,
-                    transaction_status_sender,
-                    replay_vote_sender,
-                    &mut timings,
-                    log_messages_bytes_limit,
-                    prioritization_fee_cache,
-                    None::<fn(&_) -> _>,
-                ));
+            let mut timings = ExecuteTimings::default();
+            // println!(
+            //     "Processing batch: delta_lt_hash={}",
+            //     bank.truncated_delta_lt_hash()
+            // );
+            let truncated_delta_lt_hash = bank.truncated_delta_lt_hash();
+            let expected_delta_lt_hash = "0p3zomxwGdm+S6xI".to_string();
+            if truncated_delta_lt_hash == expected_delta_lt_hash {
+                for (it, transaction) in transaction_batch
+                    .batch
+                    .sanitized_transactions()
+                    .iter()
+                    .enumerate()
+                {
+                    println!("txn-{}:", it);
+                    println!(
+                        "\tis_legacy={:?}",
+                        transaction.message().legacy_message().is_some()
+                    );
+                    for (i, (signature, pubkey_index)) in transaction
+                        .signatures()
+                        .iter()
+                        .zip(transaction.message().account_keys().iter())
+                        .enumerate()
+                    {
+                        println!(
+                            "\tkey-{}={:?}\n\tsig-{}={:?}",
+                            i,
+                            pubkey_index.to_bytes(),
+                            i,
+                            signature.as_ref().to_vec(),
+                        );
+                    }
+                    let txn: SanitizedTransaction =
+                        transaction.as_sanitized_transaction().into_owned();
+                    let msg_bytes = txn.msg_data();
+                    println!("\tmsg_bytes={:?}", msg_bytes);
+                }
+            }
+            let (result, execute_batches_us) = measure_us!(execute_batch(
+                transaction_batch,
+                bank,
+                transaction_status_sender,
+                replay_vote_sender,
+                &mut timings,
+                log_messages_bytes_limit,
+                prioritization_fee_cache,
+                None::<fn(&_) -> _>,
+            ));
+            if bank.slot() == 356797363 {
+                println!(
+                    "Processed batch:  delta_lt_hash={}",
+                    bank.truncated_delta_lt_hash()
+                );
+            }
 
             let thread_index = replay_tx_thread_pool
                 .current_thread_index()
                 .unwrap_or_default();
-                execution_timings_per_thread
-                    .lock()
-                    .unwrap()
-                    .entry(thread_index)
-                    .and_modify(|thread_execution_time| {
-                        let ThreadExecuteTimings {
-                            total_thread_us,
-                            total_transactions_executed,
-                            execute_timings: total_thread_execute_timings,
-                        } = thread_execution_time;
-                        *total_thread_us += execute_batches_us;
-                        *total_transactions_executed += transaction_count;
-                        total_thread_execute_timings
-                            .saturating_add_in_place(ExecuteTimingType::TotalBatchesLen, 1);
-                        total_thread_execute_timings.accumulate(&timings);
-                    })
-                    .or_insert(ThreadExecuteTimings {
-                        total_thread_us: Saturating(execute_batches_us),
-                        total_transactions_executed: Saturating(transaction_count),
-                        execute_timings: timings,
-                    });
-                result
-            })
-            .collect()
-    });
+            execution_timings_per_thread
+                .lock()
+                .unwrap()
+                .entry(thread_index)
+                .and_modify(|thread_execution_time| {
+                    let ThreadExecuteTimings {
+                        total_thread_us,
+                        total_transactions_executed,
+                        execute_timings: total_thread_execute_timings,
+                    } = thread_execution_time;
+                    *total_thread_us += execute_batches_us;
+                    *total_transactions_executed += transaction_count;
+                    total_thread_execute_timings
+                        .saturating_add_in_place(ExecuteTimingType::TotalBatchesLen, 1);
+                    total_thread_execute_timings.accumulate(&timings);
+                })
+                .or_insert(ThreadExecuteTimings {
+                    total_thread_us: Saturating(execute_batches_us),
+                    total_transactions_executed: Saturating(transaction_count),
+                    execute_timings: timings,
+                });
+            result
+        })
+        .collect();
     execute_batches_elapsed.stop();
 
     first_err(&results)?;
@@ -677,6 +720,11 @@ fn process_entries(
                         log_messages_bytes_limit,
                         prioritization_fee_cache,
                     )?;
+                    println!(
+                        "Confirmed slot:\n\tslot={}\n\tdelta_lt_hash={}",
+                        bank.inner.bank.slot(),
+                        bank.inner.bank.truncated_delta_lt_hash()
+                    );
                     for hash in tick_hashes.drain(..) {
                         bank.register_tick(&hash);
                     }
@@ -1538,7 +1586,13 @@ pub fn confirm_slot(
         load_result
     }?;
 
-    confirm_slot_entries(
+    // println!(
+    //     "Confirming slot:\n\tslot={}\n\tdelta_lt_hash={}",
+    //     slot,
+    //     bank.inner.bank.truncated_delta_lt_hash()
+    // );
+
+    let res = confirm_slot_entries(
         bank,
         replay_tx_thread_pool,
         slot_entries_load_result,
@@ -1551,7 +1605,9 @@ pub fn confirm_slot(
         recyclers,
         log_messages_bytes_limit,
         prioritization_fee_cache,
-    )
+    );
+
+    res
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1701,6 +1757,18 @@ fn confirm_slot_entries(
             starting_index: tx_starting_index,
         })
         .collect();
+
+    // let mut num_ticks = 0;
+    // let mut num_txns = 0;
+    // replay_entries.iter().for_each(|entry| match &entry.entry {
+    //     EntryType::Tick(_) => num_ticks += 1,
+    //     EntryType::Transactions(txs) => num_txns += txs.len(),
+    // });
+    // println!(
+    //     "\tslot {}: {} entries ({} txns, {} ticks)",
+    //     slot, num_entries, num_txns, num_ticks
+    // );
+
     let process_result = process_entries(
         bank,
         replay_tx_thread_pool,

@@ -50,6 +50,7 @@ pub fn collect_accounts_to_store<'a, T: SVMMessage>(
     txs: &'a [T],
     txs_refs: &'a Option<Vec<impl Borrow<SanitizedTransaction>>>,
     processing_results: &'a [TransactionProcessingResult],
+    print_txs: bool,
 ) -> (
     Vec<(&'a Pubkey, &'a AccountSharedData)>,
     Option<Vec<&'a SanitizedTransaction>>,
@@ -61,6 +62,10 @@ pub fn collect_accounts_to_store<'a, T: SVMMessage>(
         .then(|| Vec::with_capacity(collect_capacity));
     for (index, (processing_result, transaction)) in processing_results.iter().zip(txs).enumerate()
     {
+        if print_txs {
+            println!("\tresult: {:?}", processing_result);
+        }
+
         let Some(processed_tx) = processing_result.processed_transaction() else {
             // Don't store any accounts if tx wasn't executed
             continue;
@@ -305,7 +310,7 @@ mod tests {
         for collect_transactions in [false, true] {
             let transaction_refs = collect_transactions.then(|| txs.iter().collect::<Vec<_>>());
             let (collected_accounts, transactions) =
-                collect_accounts_to_store(&txs, &transaction_refs, &processing_results);
+                collect_accounts_to_store(&txs, &transaction_refs, &processing_results, false);
             assert_eq!(collected_accounts.len(), 2);
             assert!(collected_accounts
                 .iter()
@@ -371,7 +376,7 @@ mod tests {
         for collect_transactions in [false, true] {
             let transaction_refs = collect_transactions.then(|| txs.iter().collect::<Vec<_>>());
             let (collected_accounts, transactions) =
-                collect_accounts_to_store(&txs, &transaction_refs, &processing_results);
+                collect_accounts_to_store(&txs, &transaction_refs, &processing_results, false);
             assert_eq!(collected_accounts.len(), 1);
             assert_eq!(
                 collected_accounts
@@ -466,7 +471,7 @@ mod tests {
         for collect_transactions in [false, true] {
             let transaction_refs = collect_transactions.then(|| txs.iter().collect::<Vec<_>>());
             let (collected_accounts, transactions) =
-                collect_accounts_to_store(&txs, &transaction_refs, &processing_results);
+                collect_accounts_to_store(&txs, &transaction_refs, &processing_results, false);
             assert_eq!(collected_accounts.len(), 2);
             assert_eq!(
                 collected_accounts
@@ -574,7 +579,7 @@ mod tests {
         for collect_transactions in [false, true] {
             let transaction_refs = collect_transactions.then(|| txs.iter().collect::<Vec<_>>());
             let (collected_accounts, transactions) =
-                collect_accounts_to_store(&txs, &transaction_refs, &processing_results);
+                collect_accounts_to_store(&txs, &transaction_refs, &processing_results, false);
             assert_eq!(collected_accounts.len(), 1);
             let collected_nonce_account = collected_accounts
                 .iter()
@@ -630,7 +635,7 @@ mod tests {
         for collect_transactions in [false, true] {
             let transaction_refs = collect_transactions.then(|| txs.iter().collect::<Vec<_>>());
             let (collected_accounts, transactions) =
-                collect_accounts_to_store(&txs, &transaction_refs, &processing_results);
+                collect_accounts_to_store(&txs, &transaction_refs, &processing_results, false);
             assert_eq!(collected_accounts.len(), 1);
             assert_eq!(
                 collected_accounts
