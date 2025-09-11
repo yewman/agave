@@ -12,7 +12,7 @@ use {
     crossbeam_channel::Sender,
     itertools::Itertools,
     log::*,
-    rayon::{prelude::*, ThreadPool},
+    rayon::ThreadPool,
     scopeguard::defer,
     solana_accounts_db::{
         accounts_db::AccountsDbConfig, accounts_update_notifier_interface::AccountsUpdateNotifier,
@@ -385,50 +385,49 @@ fn execute_batches_internal(
         Mutex::new(HashMap::new());
 
     let mut execute_batches_elapsed = Measure::start("execute_batches_elapsed");
-    let results: Vec<Result<()>> = replay_tx_thread_pool.install(|| {
-        batches
-            .into_par_iter()
-            .map(|transaction_batch| {
-                let transaction_count =
-                    transaction_batch.batch.sanitized_transactions().len() as u64;
-                let mut timings = ExecuteTimings::default();
-                let (result, execute_batches_us) = measure_us!(execute_batch(
-                    transaction_batch,
-                    bank,
-                    transaction_status_sender,
-                    replay_vote_sender,
-                    &mut timings,
-                    log_messages_bytes_limit,
-                    prioritization_fee_cache,
-                    None::<fn(&_) -> _>,
-                ));
+    let results: Vec<Result<()>> = batches
+        .into_iter()
+        .map(|transaction_batch| {
+            let transaction_count = transaction_batch.batch.sanitized_transactions().len() as u64;
+            let mut timings = ExecuteTimings::default();
+            let (result, execute_batches_us) = measure_us!(execute_batch(
+                transaction_batch,
+                bank,
+                transaction_status_sender,
+                replay_vote_sender,
+                &mut timings,
+                log_messages_bytes_limit,
+                prioritization_fee_cache,
+                None::<fn(&_) -> _>,
+            ));
 
-                let thread_index = replay_tx_thread_pool.current_thread_index().unwrap();
-                execution_timings_per_thread
-                    .lock()
-                    .unwrap()
-                    .entry(thread_index)
-                    .and_modify(|thread_execution_time| {
-                        let ThreadExecuteTimings {
-                            total_thread_us,
-                            total_transactions_executed,
-                            execute_timings: total_thread_execute_timings,
-                        } = thread_execution_time;
-                        *total_thread_us += execute_batches_us;
-                        *total_transactions_executed += transaction_count;
-                        total_thread_execute_timings
-                            .saturating_add_in_place(ExecuteTimingType::TotalBatchesLen, 1);
-                        total_thread_execute_timings.accumulate(&timings);
-                    })
-                    .or_insert(ThreadExecuteTimings {
-                        total_thread_us: Saturating(execute_batches_us),
-                        total_transactions_executed: Saturating(transaction_count),
-                        execute_timings: timings,
-                    });
-                result
-            })
-            .collect()
-    });
+            let thread_index = replay_tx_thread_pool
+                .current_thread_index()
+                .unwrap_or_default();
+            execution_timings_per_thread
+                .lock()
+                .unwrap()
+                .entry(thread_index)
+                .and_modify(|thread_execution_time| {
+                    let ThreadExecuteTimings {
+                        total_thread_us,
+                        total_transactions_executed,
+                        execute_timings: total_thread_execute_timings,
+                    } = thread_execution_time;
+                    *total_thread_us += execute_batches_us;
+                    *total_transactions_executed += transaction_count;
+                    total_thread_execute_timings
+                        .saturating_add_in_place(ExecuteTimingType::TotalBatchesLen, 1);
+                    total_thread_execute_timings.accumulate(&timings);
+                })
+                .or_insert(ThreadExecuteTimings {
+                    total_thread_us: Saturating(execute_batches_us),
+                    total_transactions_executed: Saturating(transaction_count),
+                    execute_timings: timings,
+                });
+            result
+        })
+        .collect();
     execute_batches_elapsed.stop();
 
     first_err(&results)?;

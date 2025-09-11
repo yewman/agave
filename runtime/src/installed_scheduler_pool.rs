@@ -436,12 +436,12 @@ impl SchedulerStatus {
 /// unusual outside scheduler code-path)
 #[derive(Debug)]
 pub struct BankWithScheduler {
-    inner: Arc<BankWithSchedulerInner>,
+    pub inner: Arc<BankWithSchedulerInner>,
 }
 
 #[derive(Debug)]
 pub struct BankWithSchedulerInner {
-    bank: Arc<Bank>,
+    pub bank: Arc<Bank>,
     scheduler: InstalledSchedulerRwLock,
 }
 pub type InstalledSchedulerRwLock = RwLock<SchedulerStatus>;

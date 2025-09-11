@@ -29,7 +29,7 @@ mod transaction_view;
 #[cfg_attr(feature = "dev-context-only-utils", derive(Clone))]
 #[derive(Debug)]
 pub struct RuntimeTransaction<T> {
-    transaction: T,
+    pub transaction: T,
     // transaction meta is a collection of fields, it is updated
     // during message state transition
     meta: TransactionMeta,

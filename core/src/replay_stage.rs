@@ -673,7 +673,7 @@ impl ReplayStage {
             };
             let mut last_threshold_failure_slot = 0;
             // Thread pool to (maybe) replay multiple threads in parallel
-            let replay_mode = if replay_forks_threads.get() == 1 {
+            let replay_mode = if true {
                 ForkReplayMode::Serial
             } else {
                 let pool = rayon::ThreadPoolBuilder::new()
