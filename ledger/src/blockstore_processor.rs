@@ -390,44 +390,27 @@ fn execute_batches_internal(
         .map(|transaction_batch| {
             let transaction_count = transaction_batch.batch.sanitized_transactions().len() as u64;
             let mut timings = ExecuteTimings::default();
-            // println!(
-            //     "Processing batch: delta_lt_hash={}",
-            //     bank.truncated_delta_lt_hash()
-            // );
-            let truncated_delta_lt_hash = bank.truncated_delta_lt_hash();
-            let expected_delta_lt_hash = "0p3zomxwGdm+S6xI".to_string();
-            if truncated_delta_lt_hash == expected_delta_lt_hash {
+            let print_txns = if bank.slot() == 356797363 {
+                let truncated_delta_lt_hash = bank.truncated_delta_lt_hash();
+                let expected_delta_lt_hash = "0p3zomxwGdm+S6xI".to_string();
+                truncated_delta_lt_hash == expected_delta_lt_hash
+            } else {
+                false
+            };
+
+            if print_txns {
                 for (it, transaction) in transaction_batch
                     .batch
                     .sanitized_transactions()
                     .iter()
                     .enumerate()
                 {
-                    println!("txn-{}:", it);
-                    println!(
-                        "\tis_legacy={:?}",
-                        transaction.message().legacy_message().is_some()
-                    );
-                    for (i, (signature, pubkey_index)) in transaction
-                        .signatures()
-                        .iter()
-                        .zip(transaction.message().account_keys().iter())
-                        .enumerate()
-                    {
-                        println!(
-                            "\tkey-{}={:?}\n\tsig-{}={:?}",
-                            i,
-                            pubkey_index.to_bytes(),
-                            i,
-                            signature.as_ref().to_vec(),
-                        );
-                    }
-                    let txn: SanitizedTransaction =
-                        transaction.as_sanitized_transaction().into_owned();
-                    let msg_bytes = txn.msg_data();
-                    println!("\tmsg_bytes={:?}", msg_bytes);
+                    let txn = transaction.to_versioned_transaction();
+                    let txn_bytes = bincode::serialize(&txn).unwrap();
+                    println!("txn-{}: {:?}", it, txn_bytes);
                 }
             }
+
             let (result, execute_batches_us) = measure_us!(execute_batch(
                 transaction_batch,
                 bank,

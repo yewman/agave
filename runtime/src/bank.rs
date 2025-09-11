@@ -3771,6 +3771,12 @@ impl Bank {
                 print_txns,
             );
 
+            if print_txns {
+                for (key, acc) in accounts_to_store.iter() {
+                    println!("storing-account: key={} lamports={} owner={} executable={} rent_epoch={} data={:?}", key, acc.lamports(), acc.owner(), acc.executable(), acc.rent_epoch(), acc.data());
+                }
+            }
+
             let to_store = (self.slot(), accounts_to_store.as_slice());
             self.update_bank_hash_stats(&to_store);
             self.rc

@@ -63,7 +63,7 @@ pub fn collect_accounts_to_store<'a, T: SVMMessage>(
     for (index, (processing_result, transaction)) in processing_results.iter().zip(txs).enumerate()
     {
         if print_txs {
-            println!("\tresult: {:?}", processing_result);
+            println!("processing-result-{}: {:?}", index, processing_result);
         }
 
         let Some(processed_tx) = processing_result.processed_transaction() else {
