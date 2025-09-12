@@ -79,7 +79,7 @@ impl Bank {
     /// - mix in its current state
     ///
     /// This function is idempotent, and may be called more than once.
-    fn calculate_delta_lt_hash(&self) -> LtHash {
+    pub fn calculate_delta_lt_hash(&self) -> LtHash {
         debug_assert!(self.is_accounts_lt_hash_enabled());
         let measure_total = Measure::start("");
         let slot = self.slot();
